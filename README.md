@@ -4,6 +4,13 @@ A simple C source code which provides a lua metatable representing a C
 struct, can be embedded within your application.  Also it enables
 controlling access to the fields of the struct.
 
+*The original repository is hosted at 
+[https://github.com/yasuoka/luacstruct](https://github.com/yasuoka/luacstruct)*
+
+This fork includes simplified versions of the `sys/queue.h` and `sys/tree.h` headers, 
+containing only the required macros for the project to work; as well as making some changes 
+to the original code to remove the dependency on the OpenBSD headers.
+
   * [How to use](#how-to-use)
     * [1. Prerequisite](#1-prerequisite)
     * [2. Prepare](#2-prepare)
@@ -30,8 +37,6 @@ This document assumes that Lua is embed already in your application.
 
 0. copy `luacstruct.h` and `luacstruct.c` to your application, and add
    `luacstruct.c` in SRCS of Makefile of your application.
-   - luacstruct.c is using `<sys/tree.h>` and `<sys/queue.h>`.  Copy
-     them if your OS doesn't have any of them.
 1. open a source file which is doing the Lua thing.
 2. include "luacstruct.h".
 3. make sure all headers which declare the structs or enums which you
