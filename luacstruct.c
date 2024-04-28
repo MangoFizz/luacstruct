@@ -14,8 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <sys/types.h>
-#include <sys/queue.h>
-#include <sys/tree.h>
 
 #include <errno.h>
 #include <stdbool.h>
@@ -28,6 +26,9 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "queue.h"
+#include "tree.h"
+#include "endian.h"
 #include "luacstruct.h"
 
 #define LUACS_VERSION		"1"
@@ -125,7 +126,7 @@ struct luacstruct_field {
 struct luacobject {
 	enum luacstruct_type		 type;
 	struct luacstruct		*cs;
-	caddr_t				 ptr;
+	unsigned char		*ptr;
 	size_t				 size;
 	int				 nmemb;
 	int				 typref;
@@ -261,7 +262,7 @@ luacs_newstruct0(lua_State *L, const char *tname, const char *supertname)
 	memcpy(cs->metaname, metaname, MINIMUM(sizeof(metaname),
 	    sizeof(cs->metaname)));
 
-	cs->typename = index(cs->metaname, '.') + 1;
+	cs->typename = strchr(cs->metaname, '.') + 1;
 	SPLAY_INIT(&cs->fields);
 	TAILQ_INIT(&cs->sorted);
 
@@ -269,7 +270,7 @@ luacs_newstruct0(lua_State *L, const char *tname, const char *supertname)
 	if (supercs != NULL) {
 		TAILQ_FOREACH(fieldf, &supercs->sorted, queue) {
 			if ((fieldt = luacsfield_copy(L, fieldf)) == NULL) {
-				strerror_r(errno, buf, sizeof(buf));
+				strerror_s(buf, sizeof(buf), errno);
 				lua_pushstring(L, buf);
 				lua_error(L);
 				return (0);	/* not reached */
@@ -345,13 +346,13 @@ luacs_declare(lua_State *L, enum luacstruct_type _type,
 
 	cs = luacs_checkstruct(L, -1);
 	if ((field = calloc(1, sizeof(struct luacstruct_field))) == NULL) {
-		strerror_r(errno, buf, sizeof(buf));
+		strerror_s(buf, sizeof(buf), errno);
 		lua_pushstring(L, buf);
 		lua_error(L);
 	}
 	if ((field->fieldname = strdup(name)) == NULL) {
 		free(field);
-		strerror_r(errno, buf, sizeof(buf));
+		strerror_s(buf, sizeof(buf), errno);
 		lua_pushstring(L, buf);
 		lua_error(L);
 	}
@@ -556,7 +557,7 @@ luacs_newarraytype(lua_State *L, const char *tname, enum luacstruct_type _type,
 	memcpy(cat->metaname, metaname, MINIMUM(sizeof(metaname),
 	    sizeof(cat->metaname)));
 
-	cat->typename = index(cat->metaname, '.') + 1;
+	cat->typename = strchr(cat->metaname, '.') + 1;
 	if ((ret = luaL_newmetatable(L, METANAME_LUACARRAYTYPE)) != 0) {
 		lua_pushcfunction(L, luacs_arraytype__gc);
 		lua_setfield(L, -2, "__gc");
@@ -611,7 +612,7 @@ luacs_newarray0(lua_State *L, enum luacstruct_type _type, int typidx,
 	} else {
 		obj = lua_newuserdata(L, sizeof(struct luacobject) +
 		    size * nmemb);
-		obj->ptr = (caddr_t)(obj + 1);
+		obj->ptr = (void *)(obj + 1);
 	}
 	obj->type =_type;
 	obj->size = size;
@@ -1025,7 +1026,7 @@ luacs_newobject0(lua_State *L, void *ptr)
 			    field->regeon.size);
 		}
 		obj = lua_newuserdata(L, sizeof(struct luacobject) + objsiz);
-		obj->ptr = (caddr_t)(obj + 1);
+		obj->ptr = (void *)(obj + 1);
 	}
 	obj->cs = cs;
 	lua_pushvalue(L, -2);
@@ -1377,8 +1378,8 @@ luacs_object_copy(lua_State *L)
 
 	TAILQ_FOREACH(field, &l->cs->sorted, queue) {
 		if (field->regeon.size > 0)
-			memcpy((caddr_t)l->ptr + field->regeon.off,
-			    (caddr_t)r->ptr + field->regeon.off,
+			memcpy(l->ptr + field->regeon.off,
+			    r->ptr + field->regeon.off,
 			    field->regeon.size);
 		else if (field->regeon.type == LUACS_TOBJREF ||
 		    field->regeon.type == LUACS_TOBJENT ||
@@ -1740,7 +1741,7 @@ luacs_newenum0(lua_State *L, const char *ename, size_t valwidth)
 	    sizeof(ce->metaname)));
 
 	ce->valwidth = valwidth;
-	ce->enumname = index(ce->metaname, '.') + 1;
+	ce->enumname = strchr(ce->metaname, '.') + 1;
 	SPLAY_INIT(&ce->labels);
 	SPLAY_INIT(&ce->values);
 	if ((ret = luaL_newmetatable(L, METANAME_LUACSENUM)) != 0) {
